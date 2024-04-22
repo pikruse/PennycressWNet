@@ -2,11 +2,10 @@ import os, sys, glob
 import numpy as np
 import torch
 
-'''
+"""
 from: https://github.com/gr-b/W-Net-Pytorch/blob/master/
 
-Each module consists of two 3 x 3 conv layers, each followed by a ReLU
-non-linearity and batch normalization.
+Each module consists of two 3 x 3 conv layers, each followed by a ReLU non-linearity and batch normalization.
 
 In the expansive path, modules are connected via transposed 2D convolution
 layers.
@@ -17,7 +16,7 @@ output of its corresponding module in the expansive path
 we double the number of feature channels at each downsampling step
 We halve the number of feature channels at each upsampling step
 
-'''
+"""
 
 # options
 BatchNorm = True
@@ -153,7 +152,7 @@ class BaseNet(torch.nn.module): # define singular U-Net block
         for module in self.enc_modules:
             activations.append(module(self.pool(activations[-1])))
         
-        x_ = activations.pop(-1)``
+        x_ = activations.pop(-1)
 
         for conv, upconv in zip(self.dec_modules, self.dec_transpose_layers):
             skip_connection = activations.pop(-1)
