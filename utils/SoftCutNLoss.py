@@ -1,10 +1,16 @@
 # import packages
-import time
+import time, os, sys, glob
 import numpy as np
 import torch
 import torch.nn.functional as F
 
 from torch.autograd import Function
+
+os.path.append('../')
+
+# custom imports
+from utils.GetLowestGPU import GetLowestGPU``
+device = torch.device(GetLowestGPU(verbose=0))
 
 """
 code from: https://github.com/gr-b/W-Net-Pytorch/blob/master/soft_n_cut_loss.py
@@ -20,7 +26,8 @@ The NCut loss metric is then:
   N Cut loss = disassociation / association
 """
 
-def soft_cut_n_loss(inputs, segmentations):
+def soft_cut_n_loss(inputs, segmentations,
+                    k, input_size):
 
     """
     Calculate the soft N-cut loss for a batch of images
@@ -46,7 +53,7 @@ def soft_cut_n_loss(inputs, segmentations):
 
     return loss
 
-def soft_cut_n_loss_(flatten_image, prob, k, rows, cols)
+def soft_cut_n_loss_(flatten_image, prob, k, rows, cols):
     
     """
     Calculate the soft N-cut loss for a single image
