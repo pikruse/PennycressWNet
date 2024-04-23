@@ -11,7 +11,7 @@ from scipy.ndimage import distance_transform_edt
 from PIL import Image
 
 # import custom weight function
-import utils.DistanceMap as DistanceMap
+#import utils.DistanceMap as DistanceMap
 
 
 

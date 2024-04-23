@@ -64,7 +64,7 @@ class ConvBlock(torch.nn.Module):
     def forward(self, x):
         return self.module(x)
 
-class BaseNet(torch.nn.module): # define singular U-Net block
+class BaseNet(torch.nn.Module): # define singular U-Net block
 
     def __init__(self, input_channels=3,
                  encoder = [64, 128, 256, 512],
@@ -75,13 +75,13 @@ class BaseNet(torch.nn.module): # define singular U-Net block
         super(BaseNet, self).__init__()
 
         layers = [
-            torch.nn.conv2d(input_channels, 64, 3, padding = 1),
+            torch.nn.Conv2d(input_channels, 64, 3, padding = 1),
             torch.nn.InstanceNorm2d(64),
             torch.nn.BatchNorm2d(64),
             torch.nn.ReLU(),
             torch.nn.Dropout(0.1),
 
-            torch.nn.conv2d(64, 64, 3, padding = 1),
+            torch.nn.Conv2d(64, 64, 3, padding = 1),
             torch.nn.InstanceNorm2d(64),
             torch.nn.BatchNorm2d(64),
             torch.nn.ReLU(),
@@ -165,9 +165,10 @@ class BaseNet(torch.nn.module): # define singular U-Net block
 
         return segmentations
     
-class WNet(torch.nn.module):
+class WNet(torch.nn.Module):
 
     def __init__(self,
+                 k = 2,
                  encoder_layer_sizes = [64, 128, 256, 512],
                  decoder_layer_sizes = [1024, 512, 256]):
         super(WNet, self).__init__()
@@ -193,7 +194,7 @@ class WNet(torch.nn.module):
         return segmentations
 
     def forward_decoder(self, x):
-        x18 = self.U_decoder(segmentations)
+        x18 = self.U_decoder(x)
         segmentations = self.sigmoid(x18)
         return segmentations
     

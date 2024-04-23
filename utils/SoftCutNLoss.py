@@ -9,7 +9,7 @@ from torch.autograd import Function
 os.path.append('../')
 
 # custom imports
-from utils.GetLowestGPU import GetLowestGPU``
+from utils.GetLowestGPU import GetLowestGPU
 device = torch.device(GetLowestGPU(verbose=0))
 
 """
