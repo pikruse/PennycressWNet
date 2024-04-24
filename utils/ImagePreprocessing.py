@@ -1,5 +1,4 @@
 # import packages 
-import seaborn as sns
 import cv2
 import os
 import numpy as np
@@ -8,6 +7,7 @@ import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 
 from PIL import Image, ImageDraw, ImageFile
+from tqdm.auto import tqdm
 from statistics import stdev
 
 
@@ -20,17 +20,17 @@ def preprocess_images(image_names,
                      plot=True):
   
   # instantiate crop points
-  y_cut_pts=[4650, 2400, 5000, 9825, 1090, 2150, 2500, 2850]
+
   
 
 
   
-  for image_name, cut_pt in zip(image_names, y_cut_pts):
+  for image_name, cut_pt in zip(tqdm(image_names), y_cut_pts):
     if verbose:
       print(f'Processing image: {image_name}')
       
     # Load the image
-    image = Image.open(image_path + image_name)
+    image = cv2.imread(image_path + image_name)
 
     # Define the desired ranges for x and y axes
     x_start, x_end = 0, image.shape[1]
@@ -41,7 +41,7 @@ def preprocess_images(image_names,
 
     if save:
       # Save the cropped image
-      Image.save(save_path + image_name, cropped_image)
+      cv2.imwrite(save_path + image_name, cropped_image)
 
     if plot:
       fig, ax = plt.subplots(1, 2, figsize=(10, 5))

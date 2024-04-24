@@ -21,7 +21,7 @@ from utils.GetLR import get_lr
 import utils.Plot as Plot
 import utils.WeightedCrossEntropy as WeightedCrossEntropy
 import utils.BuildUNet as BuildUNet
-import utils.TileGenerator as TG
+import utils.WNetTileGenerator as TG
 import utils.DistanceMap as DistanceMap
 
 def train_model(model,
