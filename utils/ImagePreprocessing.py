@@ -12,42 +12,50 @@ from statistics import stdev
 
 
 
-def preprocess_image(image_name,
+def preprocess_image(image_names,
                      image_path,
                      save_path,
                      verbose=True,
                      save=True,
                      plot=True):
   
+  # instantiate crop points
+  y_cut_pts=[4650, 2400, 5000, 9825, 1090, 2150, 2500, 2850]
+  
 
   if verbose:
     print(f'Processing image: {image_name}')
   
-  # Load the image
-  image = Image.open(image_path + image_name)
+  for image_name, cut_pt in zip(image_names, y_cut_pts):
+    # Load the image
+    image = Image.open(image_path + image_name)
 
-  if plot:
-    # Display the image
-    plt.imshow(image)
-    plt.show()
-  
+    if plot:
+      # Display the image
+      plt.imshow(image)
+      plt.show()
 
+    # Construct the full path to the image
+    image_path = os.path.join(leaf_folder, file)
+    image = cv2.imread(image_path)
 
+    # Define the desired ranges for x and y axes
+    x_start, x_end = 0, image.shape[1]
+    y_start, y_end = cut_pt, image.shape[0]
 
+    # Perform cropping
+    cropped_image = image[y_start:y_end, :]
 
-  # Construct the full path to the image
-  image_path = os.path.join(leaf_folder, file)
-  image = cv2.imread(image_path)
+    if save:
+      # Save the cropped image
+      Image.save(save_path + image_name, cropped_image)
 
-  # Define the desired ranges for x and y axes
-  x_start, x_end = 0, image.shape[1]
-  y_start, y_end = cut, image.shape[0]
+    if plot:``
+      fig, ax = plt.subplots(1, 2, figsize=(10, 5))
+      ax[0].imshow(image)
+      ax[0].set_title('Original Image')
+      ax[1].imshow(cropped_image)
+      ax[1].set_title('Cropped Image')
+      plt.show()
 
-  # Perform cropping
-  cropped_image = image[y_start:y_end, :]
-
-  if plot:
-    plt.imshow(cropped_image)
-    plt.show()
-
-  return cropped_image
+  return None
