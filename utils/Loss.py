@@ -6,11 +6,10 @@ import torch.nn.functional as F
 
 from torch.autograd import Function
 
-os.path.append('../')
+sys.path.append('../')
 
 # custom imports
 from utils.GetLowestGPU import GetLowestGPU
-device = torch.device(GetLowestGPU(verbose=0))
 
 """
 code from: https://github.com/gr-b/W-Net-Pytorch/blob/master/soft_n_cut_loss.py
@@ -26,8 +25,9 @@ The NCut loss metric is then:
   N Cut loss = disassociation / association
 """
 
-def soft_cut_n_loss(inputs, segmentations,
-                    k, input_size):
+def soft_n_cut_loss(inputs, segmentations,
+                    k, input_size,
+                    device):
 
     """
     Calculate the soft N-cut loss for a batch of images
@@ -47,13 +47,19 @@ def soft_cut_n_loss(inputs, segmentations,
         # flatten image
         flatten_image = torch.mean(inputs[i], dim=0)
         flatten_image = flatten_image.reshape(flatten_image.shape[0]**2)
-        loss += soft_cut_n_loss_(flatten_image, segmentations[i], k, input_size, input_size)
+        loss += soft_n_cut_loss_(flatten_image, 
+                                 segmentations[i], 
+                                 k, 
+                                 input_size, 
+                                 input_size, 
+                                 device=device)
     
     loss = loss / inputs.shape[0]
 
     return loss
 
-def soft_cut_n_loss_(flatten_image, prob, k, rows, cols):
+def soft_n_cut_loss_(flatten_image, prob, k, rows, cols,
+                     device):
     
     """
     Calculate the soft N-cut loss for a single image
@@ -74,9 +80,9 @@ def soft_cut_n_loss_(flatten_image, prob, k, rows, cols):
     for t in range(k):
         soft_n_cut_loss = soft_n_cut_loss - (numerator(prob[t, :, ], weights)/denominator(prob[t, :, :], weights))
 
-    return soft_cut_n_loss
+    return soft_n_cut_loss
 
-def edge_weights(flatten_image, rows, cols,
+def edge_weights(flatten_image, rows, cols, device,
                  std_intensity = 3, std_position = 1, radius = 5):
     
     """

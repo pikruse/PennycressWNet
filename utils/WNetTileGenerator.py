@@ -87,7 +87,9 @@ class TileGenerator(Dataset):
         #convert to torch tensor
         tile = torch.from_numpy(tile.transpose(2, 0, 1)) #convert to torch tensor and transpose to channels first      
 
-        # convert to float``
+        # convert to float
         tile = tile.float()
 
-        return tile
+        tile_out = tile.detach().clone()
+
+        return tile, tile_out
