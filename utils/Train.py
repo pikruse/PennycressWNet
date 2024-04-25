@@ -18,22 +18,15 @@ sys.path.append('../')
 
 from utils.GetLowestGPU import GetLowestGPU
 from utils.GetLR import get_lr
-import utils.Plot as Plot
-import utils.WeightedCrossEntropy as WeightedCrossEntropy
-import utils.BuildUNet as BuildUNet
+import utils.BuildWNet as BuildWNet
 import utils.WNetTileGenerator as TG
-import utils.DistanceMap as DistanceMap
 
 def train_model(model,
-                loss_function,
                 optimizer,
                 train_generator,
                 val_generator,
                 log_path,
                 chckpnt_path,
-                model_kwargs,
-                train_idx,
-                val_idx,
                 device,
                 batch_size = 32,
                 batches_per_eval = 1000,
@@ -53,7 +46,6 @@ def train_model(model,
 
     Parameters:
         model (torch.nn.Module): model to train
-        loss_function (torch.nn.Module): loss function to use
         optimizer(torch.optim): optimizer to use
 
         train_generator (torch.utils.data.Dataset): training data generator
@@ -61,9 +53,6 @@ def train_model(model,
 
         log_path (str): path to save log
         chckpnt_path (str): path to save model checkpoints
-        model_kwargs (dict): parameters for model, used for checkpointing
-        train_idx (list): images used for training
-        val_idx (list): images used for validation
         device (torch.device): device to train on (e.g. cuda:0)
 
         batch_size (int): batch size
@@ -81,6 +70,9 @@ def train_model(model,
     Returns:
         None
     """
+
+
+
 
     # non-customizable options
     iter_update = 'train loss {1:.4e}, val loss {2:.4e}\r'
@@ -135,13 +127,26 @@ def train_model(model,
                 for (xbt, ybt), (xbv, ybv) in zip(train_loader, val_loader):
                     xbt, ybt = xbt.to(device), ybt.to(device)
                     xbv, ybv = xbv.to(device), ybv.to(device)
-                    train_loss += loss_function(model(xbt), ybt).item()
-                    val_loss += loss_function(model(xbv), ybv).item()
+
+                    #compute train loss
+                    train_segmentations, train_reconstructions = model(xbt)
+                    train_l_soft_n_cut = Loss.soft_n_cut_loss(xbt, train_segmentations)
+                    train_l_reconstruction = Loss.reconstruction_loss(ybt, train_reconstructions)
+                    train_loss += train_l_soft_n_cut + train_l_reconstruction
+
+                    #compute val loss
+                    val_segmentations, val_reconstructions = model(xbv)
+                    val_l_soft_n_cut = Loss.soft_n_cut_loss(xbv, val_segmentations)
+                    val_l_reconstruction = Loss.reconstruction_loss(ybv, val_reconstructions)
+                    val_loss += val_l_soft_n_cut + val_l_reconstruction
+
                     pbar.update(1)
                     if pbar.n == pbar.total:
                         break
             train_loss /= batches_per_eval
             val_loss /= batches_per_eval
+
+        # set model back to training mode
         model.train()
 
         # update user
@@ -156,11 +161,8 @@ def train_model(model,
             checkpoint = {
                 'model': model.state_dict(),
                 'optimizer': optimizer.state_dict(),
-                'kwargs': model_kwargs,
                 'iter_num': iter_num,
-                'best_val_loss': best_val_loss,
-                'train_ids': train_idx,
-                'val_ids': val_idx,
+                'best_val_loss': best_val_loss
             }
             torch.save(checkpoint, chckpnt_path.format(iter_num))
 
@@ -200,7 +202,11 @@ def train_model(model,
                 # update the model
                 xb, yb = xb.to(device), yb.to(device)
 
-                loss = loss_function(model(xb), yb)
+                #compute loss
+                segmentations, reconstructions = model(xb)
+                l_soft_n_cut = Loss.soft_n_cut_loss(xb, segmentations)
+                l_reconstruction = Loss.reconstruction_loss(yb, reconstructions)
+                loss += l_soft_n_cut + l_reconstruction
 
                 if torch.isnan(loss):
                     print('loss is NaN, stopping')
@@ -219,6 +225,7 @@ def train_model(model,
                 loss.backward()
 
                 optimizer.step()
+
                 optimizer.zero_grad(set_to_none=True)
 
                 # update book keeping
@@ -231,5 +238,6 @@ def train_model(model,
         if iter_num > max_iters:
             print(f'maximum iterations reached: {max_iters}')
             break
-        
+            
+
     return None
