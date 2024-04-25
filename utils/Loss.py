@@ -48,7 +48,7 @@ def soft_n_cut_loss(inputs, segmentations, device,
     for i in range(inputs.shape[0]):
         # flatten image
         flatten_image = torch.mean(inputs[i], dim=0)
-        flatten_image = flatten_image.reshape(flatten_image.shape[0]**2)
+        flatten_image = flatten_image.view(flatten_image.shape[0]**2)
         loss += soft_n_cut_loss_(flatten_image, 
                                  segmentations[i], 
                                  k, 
@@ -117,8 +117,8 @@ def edge_weights(flatten_image, rows, cols, device,
     xx, yy = torch.meshgrid(torch.arange(rows, dtype=torch.float),
                            torch.arange(cols, dtype=torch.float))
 
-    xx = xx.reshape(rows*cols)
-    yy = yy.reshape(rows*cols)
+    xx = xx.view(rows*cols)
+    yy = yy.view(rows*cols)
 
     xx, yy = xx.to(device), yy.to(device)
 
@@ -153,8 +153,8 @@ def outer_product(v1, v2):
         v1 x v2 (tensor): m x m tensor
     """
 
-    v1 = v1.reshape(-1)
-    v2 = v2.reshape(-1)
+    v1 = v1.view(-1)
+    v2 = v2.view(-1)
 
     v1 = torch.unsqueeze(v1, dim=0)
     v2 = torch.unsqueeze(v2, dim=0)
@@ -174,7 +174,7 @@ def numerator(k_class_prob, weights):
         numerator (tensor): numerator for the soft N-cut loss
     """
 
-    k_class_prob = k_class_prob.reshape(-1)
+    k_class_prob = k_class_prob.view(-1)
     a = torch.mul(weights, outer_product(k_class_prob, k_class_prob))
 
     return torch.sum(a)
