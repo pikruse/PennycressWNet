@@ -18,8 +18,11 @@ sys.path.append('../')
 
 from utils.GetLowestGPU import GetLowestGPU
 from utils.GetLR import get_lr
+import utils.Loss as Loss
 import utils.BuildWNet as BuildWNet
 import utils.WNetTileGenerator as TG
+
+reload(Loss)
 
 def train_model(model,
                 optimizer,
@@ -28,7 +31,7 @@ def train_model(model,
                 log_path,
                 chckpnt_path,
                 device,
-                batch_size = 32,
+                batch_size = 1,
                 batches_per_eval = 1000,
                 warmup_iters = 1000,
                 lr_decay_iters = 120000,
@@ -130,15 +133,15 @@ def train_model(model,
 
                     #compute train loss
                     train_segmentations, train_reconstructions = model(xbt)
-                    train_l_soft_n_cut = Loss.soft_n_cut_loss(xbt, train_segmentations)
+                    train_l_soft_n_cut = Loss.soft_n_cut_loss(xbt, train_segmentations, device = device)
                     train_l_reconstruction = Loss.reconstruction_loss(ybt, train_reconstructions)
-                    train_loss += train_l_soft_n_cut + train_l_reconstruction
+                    train_loss += (train_l_soft_n_cut + train_l_reconstruction).item()
 
                     #compute val loss
                     val_segmentations, val_reconstructions = model(xbv)
-                    val_l_soft_n_cut = Loss.soft_n_cut_loss(xbv, val_segmentations)
+                    val_l_soft_n_cut = Loss.soft_n_cut_loss(xbv, val_segmentations, device = device)
                     val_l_reconstruction = Loss.reconstruction_loss(ybv, val_reconstructions)
-                    val_loss += val_l_soft_n_cut + val_l_reconstruction
+                    val_loss += (val_l_soft_n_cut + val_l_reconstruction).item()
 
                     pbar.update(1)
                     if pbar.n == pbar.total:
@@ -204,9 +207,9 @@ def train_model(model,
 
                 #compute loss
                 segmentations, reconstructions = model(xb)
-                l_soft_n_cut = Loss.soft_n_cut_loss(xb, segmentations)
+                l_soft_n_cut = Loss.soft_n_cut_loss(xb, segmentations, device = device)
                 l_reconstruction = Loss.reconstruction_loss(yb, reconstructions)
-                loss += l_soft_n_cut + l_reconstruction
+                loss += (l_soft_n_cut + l_reconstruction).item()
 
                 if torch.isnan(loss):
                     print('loss is NaN, stopping')

@@ -2,6 +2,11 @@ import os, sys, glob
 import numpy as np
 import torch
 
+sys.path.append('../')
+
+# custom imports
+import utils.BuildUNet as BuildUNet
+
 """
 from: https://github.com/gr-b/W-Net-Pytorch/blob/master/
 
@@ -67,23 +72,23 @@ class ConvBlock(torch.nn.Module):
 class BaseNet(torch.nn.Module): # define singular U-Net block
 
     def __init__(self, input_channels=3,
-                 encoder = [64, 128, 256, 512],
-                 decoder = [1024, 512, 256],
+                 encoder = [32, 64, 128],
+                 decoder = [256, 128, 64],
                  output_channels = k):
         
         # init nn.module class
         super(BaseNet, self).__init__()
 
         layers = [
-            torch.nn.Conv2d(input_channels, 64, 3, padding = 1),
-            torch.nn.InstanceNorm2d(64),
-            torch.nn.BatchNorm2d(64),
+            torch.nn.Conv2d(input_channels, 32, 3, padding = 1),
+            torch.nn.InstanceNorm2d(32),
+            torch.nn.BatchNorm2d(32),
             torch.nn.ReLU(),
             torch.nn.Dropout(0.1),
 
-            torch.nn.Conv2d(64, 64, 3, padding = 1),
-            torch.nn.InstanceNorm2d(64),
-            torch.nn.BatchNorm2d(64),
+            torch.nn.Conv2d(32, 32, 3, padding = 1),
+            torch.nn.InstanceNorm2d(32),
+            torch.nn.BatchNorm2d(32),
             torch.nn.ReLU(),
             torch.nn.Dropout(0.1),
         ]
@@ -116,22 +121,22 @@ class BaseNet(torch.nn.Module): # define singular U-Net block
             [ConvBlock(3*channels_out, channels_out) for channels_out in decoder_out_sizes]
         )
 
-        self.last_dec_transpose_layer = torch.nn.ConvTranspose2d(128, 128, 2, stride = 2)
+        self.last_dec_transpose_layer = torch.nn.ConvTranspose2d(64, 64, 2, stride = 2)
 
         layers = [
-            torch.nn.Conv2d(128+64, 64, 3, padding=1),
-            torch.nn.InstanceNorm2d(64),
-            torch.nn.BatchNorm2d(64),
+            torch.nn.Conv2d(64, 32, 3, padding=1),
+            torch.nn.InstanceNorm2d(32),
+            torch.nn.BatchNorm2d(32),
             torch.nn.ReLU(),
             torch.nn.Dropout(0.1),
 
-            torch.nn.Conv2d(64, 64, 3, padding=1),
-            torch.nn.InstanceNorm2d(64),
-            torch.nn.BatchNorm2d(64),
+            torch.nn.Conv2d(32, 32, 3, padding=1),
+            torch.nn.InstanceNorm2d(32),
+            torch.nn.BatchNorm2d(32),
             torch.nn.ReLU(),
             torch.nn.Dropout(0.1),
 
-            torch.nn.Conv2d(64, output_channels, 1),
+            torch.nn.Conv2d(128, output_channels, 1),
             torch.nn.ReLU(),
         ]
 
@@ -168,34 +173,39 @@ class BaseNet(torch.nn.Module): # define singular U-Net block
 class WNet(torch.nn.Module):
 
     def __init__(self,
-                 k = 2,
-                 encoder_layer_sizes = [64, 128, 256, 512],
-                 decoder_layer_sizes = [1024, 512, 256]):
+                 k = 4,
+                 layer_sizes = [16, 32, 64, 128]):
         super(WNet, self).__init__()
 
-        self.U_encoder = BaseNet(input_channels=3,
-                                 encoder = encoder_layer_sizes,
-                                 decoder = decoder_layer_sizes,
-                                 output_channels = k)
+        self.U_encoder = BuildUNet.UNet(layer_sizes = layer_sizes,
+                                   in_channels=3,
+                                   out_channels=k,
+                                   dropout_rate=0.1,
+                                   conv_per_block=3,
+                                   hidden_activation=torch.nn.SELU(),
+                                   output_activation=None)
 
         self.softmax = torch.nn.Softmax2d()
 
-        self.U_decoder = BaseNet(input_channels =  k,
-                                 encoder = encoder_layer_sizes,
-                                 decoder = decoder_layer_sizes,
-                                 output_channels = 3)
+        self.U_decoder = BuildUNet.UNet(layer_sizes = layer_sizes,
+                                   in_channels=k,
+                                   out_channels=3,
+                                   dropout_rate=0.1,
+                                   conv_per_block=3,
+                                   hidden_activation=torch.nn.SELU(),
+                                   output_activation=None)
         
         self.sigmoid = torch.nn.Sigmoid()
 
     def forward_encoder(self, x):
-        x9 = self.U_encoder(x)
-        segmentations = self.softmax(x9)
+        U_enc_logits = self.U_encoder(x)
+        segmentations = self.softmax(U_enc_logits)
 
         return segmentations
 
     def forward_decoder(self, x):
-        x18 = self.U_decoder(x)
-        segmentations = self.sigmoid(x18)
+        U_dec_logits = self.U_decoder(x)
+        segmentations = self.sigmoid(U_dec_logits)
         return segmentations
     
     def forward(self, x): # x is 3 channels, 224x224

@@ -25,9 +25,9 @@ The NCut loss metric is then:
   N Cut loss = disassociation / association
 """
 
-def soft_n_cut_loss(inputs, segmentations,
-                    k, input_size,
-                    device):
+def soft_n_cut_loss(inputs, segmentations, device,
+                    k = 4, 
+                    input_size = 224):
 
     """
     Calculate the soft N-cut loss for a batch of images
@@ -35,7 +35,9 @@ def soft_n_cut_loss(inputs, segmentations,
     Parameters:
         inputs (tensor): (batch_size x 3 x h x w) tensor of input images
         segmentations (tensor): (batch_size x h x w x k) tensor of the probability of each pixel being in each class
-    
+        k (int): number of classes
+        input_size (int): size of the input image
+
     Returns:
         loss (tensor): single loss value for the batch
     """
@@ -51,15 +53,14 @@ def soft_n_cut_loss(inputs, segmentations,
                                  segmentations[i], 
                                  k, 
                                  input_size, 
-                                 input_size, 
-                                 device=device)
+                                 input_size,
+                                 device)
     
     loss = loss / inputs.shape[0]
 
     return loss
 
-def soft_n_cut_loss_(flatten_image, prob, k, rows, cols,
-                     device):
+def soft_n_cut_loss_(flatten_image, prob, k, rows, cols, device):
     
     """
     Calculate the soft N-cut loss for a single image
@@ -75,7 +76,7 @@ def soft_n_cut_loss_(flatten_image, prob, k, rows, cols,
         soft_n_cut_loss (tensor): loss for single image
     """
     soft_n_cut_loss = k
-    weights = edge_weights(flatten_image, rows, cols)
+    weights = edge_weights(flatten_image, rows, cols, device = device)
 
     for t in range(k):
         soft_n_cut_loss = soft_n_cut_loss - (numerator(prob[t, :, ], weights)/denominator(prob[t, :, :], weights))
@@ -83,7 +84,8 @@ def soft_n_cut_loss_(flatten_image, prob, k, rows, cols,
     return soft_n_cut_loss
 
 def edge_weights(flatten_image, rows, cols, device,
-                 std_intensity = 3, std_position = 1, radius = 5):
+                 std_intensity = 3, std_position = 1,
+                 radius = 5):
     
     """
     Computes 2D tensor of edge weights in the pixel graph
@@ -112,7 +114,7 @@ def edge_weights(flatten_image, rows, cols, device,
     d = torch.div((A - A_T), std_intensity)
     intensity_weight = torch.exp(-1*torch.mul(d, d))
 
-    xx, yy, torch.meshgrid(torch.arange(rows, dtype=torch.float),
+    xx, yy = torch.meshgrid(torch.arange(rows, dtype=torch.float),
                            torch.arange(cols, dtype=torch.float))
 
     xx = xx.reshape(rows*cols)
