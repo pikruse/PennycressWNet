@@ -31,7 +31,7 @@ def train_model(model,
                 log_path,
                 chckpnt_path,
                 device,
-                batch_size = 1,
+                batch_size = 32,
                 batches_per_eval = 1000,
                 warmup_iters = 1000,
                 lr_decay_iters = 120000,
@@ -41,7 +41,7 @@ def train_model(model,
                 log_interval = 1,
                 eval_interval = 1000,
                 early_stop = 50,
-                n_workers = 32,
+                n_workers = 64,
                 ):
     
     """
@@ -135,13 +135,13 @@ def train_model(model,
                     train_segmentations, train_reconstructions = model(xbt)
                     train_l_soft_n_cut = Loss.soft_n_cut_loss(xbt, train_segmentations, device = device)
                     train_l_reconstruction = Loss.reconstruction_loss(ybt, train_reconstructions)
-                    train_loss += (train_l_soft_n_cut + train_l_reconstruction).item()
+                    train_loss += (train_l_soft_n_cut + train_l_reconstruction)
 
                     #compute val loss
                     val_segmentations, val_reconstructions = model(xbv)
-                    val_l_soft_n_cut = Loss.soft_n_cut_loss(xbv, val_segmentations, device = device)
+                    val_l_soft_n_cut = Loss.soft_n_cut_loss(xbv, val_segmentations,  device = device)
                     val_l_reconstruction = Loss.reconstruction_loss(ybv, val_reconstructions)
-                    val_loss += (val_l_soft_n_cut + val_l_reconstruction).item()
+                    val_loss += (val_l_soft_n_cut + val_l_reconstruction)
 
                     pbar.update(1)
                     if pbar.n == pbar.total:
@@ -209,7 +209,7 @@ def train_model(model,
                 segmentations, reconstructions = model(xb)
                 l_soft_n_cut = Loss.soft_n_cut_loss(xb, segmentations, device = device)
                 l_reconstruction = Loss.reconstruction_loss(yb, reconstructions)
-                loss += (l_soft_n_cut + l_reconstruction).item()
+                loss = (l_soft_n_cut + l_reconstruction)
 
                 if torch.isnan(loss):
                     print('loss is NaN, stopping')
