@@ -174,7 +174,7 @@ class WNet(torch.nn.Module):
 
     def __init__(self,
                  k = 4,
-                 layer_sizes = [16, 32, 64, 128]):
+                 layer_sizes = [32, 64, 128, 256]):
         super(WNet, self).__init__()
 
         self.U_encoder = BuildUNet.UNet(layer_sizes = layer_sizes,
@@ -182,7 +182,7 @@ class WNet(torch.nn.Module):
                                    out_channels=k,
                                    dropout_rate=0.1,
                                    conv_per_block=3,
-                                   hidden_activation=torch.nn.SELU(),
+                                   hidden_activation=torch.nn.LeakyReLU(),
                                    output_activation=None)
 
         self.softmax = torch.nn.Softmax2d()
@@ -192,7 +192,7 @@ class WNet(torch.nn.Module):
                                    out_channels=3,
                                    dropout_rate=0.1,
                                    conv_per_block=3,
-                                   hidden_activation=torch.nn.SELU(),
+                                   hidden_activation=torch.nn.LeakyReLU(),
                                    output_activation=None)
         
         self.sigmoid = torch.nn.Sigmoid()
