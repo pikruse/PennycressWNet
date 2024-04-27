@@ -150,6 +150,6 @@ def denominator(k_class_prob,weights):
         )
 
 def reconstruction_loss(x, x_prime):
-    bce = F.binary_cross_entropy(x_prime, x, reduction = 'sum')
+    bce = F.binary_cross_entropy(x_prime, x, reduction = 'mean')
     return bce
     
