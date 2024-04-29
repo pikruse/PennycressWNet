@@ -85,6 +85,11 @@ def train_model(model,
     last_improved = 0 # start early stopping counter
     iter_num = 0 # initialize iteration counter
     t0 = time.time() # start timer
+    shrinkage = .01 # shrinkage param. for sobel reg
+
+    # init. losses
+    n_cut_loss = Loss.NCutLoss2D(device = device)
+    opening_loss = Loss.OpeningLoss2D(device = device)
 
     # sobel operator
     sobel = Sobel.Sobel(channels=4).to(device)
@@ -138,17 +143,19 @@ def train_model(model,
 
                     #compute train loss
                     train_segmentations, train_reconstructions = model(xbt)
-                    #train_l_soft_n_cut = Loss.soft_n_cut_loss(xbt, train_segmentations, device = device)
+                    train_l_n_cut = n_cut_loss(xbt, train_segmentations)
+                    train_l_opening = opening_loss(train_segmentations)
                     train_l_reconstruction = Loss.reconstruction_loss(ybt, train_reconstructions)
-                    train_sobel_reg = torch.mean(sobel(train_segmentations))
-                    train_loss += ((10 * train_l_reconstruction) + train_sobel_reg)
+                    #train_sobel_reg = torch.mean(sobel(train_segmentations))
+                    train_loss += (train_l_n_cut + train_l_opening + train_l_reconstruction)
 
                     #compute val loss
                     val_segmentations, val_reconstructions = model(xbv)
-                    #val_l_soft_n_cut = Loss.soft_n_cut_loss(xbv, val_segmentations,  device = device)
+                    val_l_n_cut = n_cut_loss(xbv, val_segmentations)
+                    val_l_opening = opening_loss(val_segmentations)
                     val_l_reconstruction = Loss.reconstruction_loss(ybv, val_reconstructions)
-                    val_sobel_reg = torch.mean(sobel(val_segmentations))
-                    val_loss += ((10 * val_l_reconstruction) + val_sobel_reg)
+                    #val_sobel_reg = torch.mean(sobel(val_segmentations))
+                    val_loss += (val_l_n_cut + val_l_opening + val_l_reconstruction)
 
                     pbar.update(1)
                     if pbar.n == pbar.total:
@@ -214,10 +221,11 @@ def train_model(model,
 
                 #compute loss
                 segmentations, reconstructions = model(xb)
-                #l_soft_n_cut = Loss.soft_n_cut_loss(xb, segmentations, device = device)
+                l_n_cut = n_cut_loss(xb, segmentations)
+                l_opening = opening_loss(segmentations)
                 l_reconstruction = Loss.reconstruction_loss(yb, reconstructions)
-                sobel_reg = torch.mean(sobel(segmentations))
-                loss = ((10 * l_reconstruction) + sobel_reg)
+                #sobel_reg = torch.mean(sobel(segmentations))
+                loss = (l_n_cut + l_opening + l_reconstruction)
 
                 if torch.isnan(loss):
                     print('loss is NaN, stopping')

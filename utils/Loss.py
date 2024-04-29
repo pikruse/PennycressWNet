@@ -26,7 +26,7 @@ class NCutLoss2D(nn.Module):
                  sigma_1: float = 5,
                  sigma_2: float = 1):
         
-        """`
+        """
         Parameters:
             radius (int): radius of spatial interaction term
             sigma_1 (float): standard deviation of the spatial Gaussian interaction
