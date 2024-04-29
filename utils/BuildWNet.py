@@ -175,13 +175,13 @@ class WNet(torch.nn.Module):
     def __init__(self,
                  k = 4,
                  enc_layer_sizes = [32, 64, 128],
-                 dec_layer_sizes = [16, 32, 64]):
+                 dec_layer_sizes = [32, 64, 128]):
         super(WNet, self).__init__()
 
         self.U_encoder = BuildUNet.UNet(layer_sizes = enc_layer_sizes,
                                    in_channels=3,
                                    out_channels=k,
-                                   dropout_rate=0.2,
+                                   dropout_rate=0.1,
                                    conv_per_block=3,
                                    hidden_activation=torch.nn.LeakyReLU(),
                                    output_activation=None)
@@ -191,8 +191,8 @@ class WNet(torch.nn.Module):
         self.U_decoder = BuildUNet.UNet(layer_sizes = dec_layer_sizes,
                                    in_channels=k,
                                    out_channels=3,
-                                   dropout_rate=0.2,
-                                   conv_per_block=1,
+                                   dropout_rate=0.1,
+                                   conv_per_block=3,
                                    hidden_activation=torch.nn.LeakyReLU(),
                                    output_activation=None)
         

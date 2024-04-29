@@ -27,7 +27,7 @@ reload(Loss)
 reload(Sobel)
 
 def train_model(model,
-                optimizer,
+                optimizers,
                 train_generator,
                 val_generator,
                 log_path,
@@ -36,7 +36,7 @@ def train_model(model,
                 batch_size = 32,
                 batches_per_eval = 1000,
                 warmup_iters = 10000,
-                lr_decay_iters = 120000,
+                lr_decay_iters = 90000,
                 max_lr = 1e-3,
                 min_lr = 1e-5,
                 max_iters = 150000,
@@ -51,7 +51,7 @@ def train_model(model,
 
     Parameters:
         model (torch.nn.Module): model to train
-        optimizer(torch.optim): optimizer to use
+        optimizer(list of torch.optim): optimizers to use
 
         train_generator (torch.utils.data.Dataset): training data generator
         val_generator (torch.utils.data.Dataset): validation data generator
@@ -77,27 +77,26 @@ def train_model(model,
     """
 
 
-
-
+    # split optimizers
+    optE = optimizers[0]
+    optW = optimizers[1]
+    
     # non-customizable options
-    iter_update = 'train loss {1:.4e}, val loss {2:.4e}\r'
-    best_val_loss = None # initialize best validation loss
+    iter_update = 'train N-cut loss: {1:.4e}, train reconstruction loss: {2:.4e}\nval N-cut loss: {3:.4e}, val reconstruction loss: {4:.4e}\r'
+
+    best_n_cut = None # initialize best validation loss
+    best_reconstruction = None # initialize best validation loss
+
     last_improved = 0 # start early stopping counter
     iter_num = 0 # initialize iteration counter
-    t0 = time.time() # start timer
-    shrinkage = .01 # shrinkage param. for sobel reg
 
     # init. losses
     n_cut_loss = Loss.NCutLoss2D(device = device)
-    opening_loss = Loss.OpeningLoss2D(device = device)
-
-    # sobel operator
-    sobel = Sobel.Sobel(channels=4).to(device)
 
     # training loop
     # refresh log
     with open(log_path, 'w') as f: 
-        f.write(f'iter_num,train_loss,val_loss\n')
+        f.write(f'iter_num,train_n_cut,train_reconstruction,val_n_cut,val_reconstruction\n')
 
     # keep training until break
     while True:
@@ -105,10 +104,10 @@ def train_model(model,
         # clear print output
         clear_output(wait=True)
 
-        if best_val_loss is not None:
-            print('---------------------------------------\n',
-                f'Iteration: {iter_num} | Best Loss: {best_val_loss:.4e}\n', 
-                '---------------------------------------', sep = '')
+        if (best_n_cut and best_reconstruction) is not None:
+            print('------------------------------------------------------------------------------\n',
+                f'Iteration: {iter_num} | Best N-cut: {best_n_cut:.4e} | Best Reconstruction: {best_reconstruction:.4e}\n', 
+                '------------------------------------------------------------------------------', sep = '')
         else:
             print('-------------\n',
                 f'Iteration: {iter_num}\n', 
@@ -135,7 +134,7 @@ def train_model(model,
         # estimate loss
         model.eval()
         with torch.no_grad():
-            train_loss, val_loss = 0, 0
+            train_l_n_cut, train_l_reconstruction, val_l_n_cut, val_l_reconstruction = 0, 0, 0, 0
             with tqdm(total=batches_per_eval, desc=' Eval') as pbar:
                 for (xbt, ybt), (xbv, ybv) in zip(train_loader, val_loader):
                     xbt, ybt = xbt.to(device), ybt.to(device)
@@ -143,55 +142,62 @@ def train_model(model,
 
                     #compute train loss
                     train_segmentations, train_reconstructions = model(xbt)
-                    train_l_n_cut = n_cut_loss(xbt, train_segmentations)
-                    #train_l_opening = opening_loss(train_segmentations)
-                    train_l_reconstruction = Loss.reconstruction_loss(ybt, train_reconstructions)
-                    #train_sobel_reg = torch.mean(sobel(train_segmentations))
-                    train_loss += (train_l_n_cut + train_l_reconstruction)
+                    train_l_n_cut += n_cut_loss(train_segmentations, xbt)
+                    train_l_reconstruction += Loss.reconstruction_loss(ybt, train_reconstructions)
 
                     #compute val loss
                     val_segmentations, val_reconstructions = model(xbv)
-                    val_l_n_cut = n_cut_loss(xbv, val_segmentations)
-                    #val_l_opening = opening_loss(val_segmentations)
-                    val_l_reconstruction = Loss.reconstruction_loss(ybv, val_reconstructions)
-                    #val_sobel_reg = torch.mean(sobel(val_segmentations))
-                    val_loss += (val_l_n_cut + val_l_reconstruction)
+                    val_l_n_cut += n_cut_loss(val_segmentations, xbv)
+                    val_l_reconstruction += Loss.reconstruction_loss(ybv, val_reconstructions)
 
                     pbar.update(1)
                     if pbar.n == pbar.total:
                         break
-            train_loss /= batches_per_eval
-            val_loss /= batches_per_eval
+
+            train_l_n_cut /= batches_per_eval
+            train_l_reconstruction /= batches_per_eval
+
+            val_l_n_cut /= batches_per_eval
+            val_l_reconstruction /= batches_per_eval
 
         # set model back to training mode
         model.train()
 
         # update user
-        print(iter_update.format(iter_num, train_loss, val_loss)) 
+        print(iter_update.format(iter_num, 
+                                 train_l_n_cut,
+                                 train_l_reconstruction, 
+                                 val_l_n_cut, 
+                                 val_l_reconstruction)) 
 
         # update log
         with open(log_path, 'a') as f: 
-            f.write(f'{iter_num},{train_loss},{val_loss}\n')
+            f.write(f'{iter_num},{train_l_n_cut},{train_l_reconstruction},{val_l_n_cut},{val_l_reconstruction}\n')
 
         # checkpoint model
         if iter_num > 0:
             checkpoint = {
                 'model': model.state_dict(),
-                'optimizer': optimizer.state_dict(),
+                'optimizer_E': optE.state_dict(),
+                'optimizer_W': optW.state_dict(),
                 'iter_num': iter_num,
-                'best_val_loss': best_val_loss
+                'best_n_cut': best_n_cut,
+                'best_reconstruction': best_reconstruction
             }
+
             torch.save(checkpoint, chckpnt_path.format(iter_num))
 
         # book keeping
-        if best_val_loss is None:
-            best_val_loss = val_loss
+        if (best_n_cut and best_reconstruction) is None:
+            best_n_cut = val_l_n_cut
+            best_reconstruction = val_l_reconstruction
 
         if iter_num > 0:
-            if val_loss < best_val_loss:
-                best_val_loss = val_loss
+            if val_l_n_cut < best_n_cut and val_l_reconstruction < best_reconstruction:
+                best_n_cut = val_l_n_cut
+                best_reconstruction = val_l_reconstruction
                 last_improved = 0
-                print(f'*** validation loss improved: {best_val_loss:.4e} ***')
+                print(f'*** validation losses improved ***\n*** N-cut: {best_n_cut:.4e}, reconstruction: {best_reconstruction} ***')
             else:
                 last_improved += 1
                 print(f'validation has not improved in {last_improved} steps')
@@ -219,18 +225,6 @@ def train_model(model,
                 # update the model
                 xb, yb = xb.to(device), yb.to(device)
 
-                #compute loss
-                segmentations, reconstructions = model(xb)
-                l_n_cut = n_cut_loss(xb, segmentations)
-                #l_opening = opening_loss(segmentations)
-                l_reconstruction = Loss.reconstruction_loss(yb, reconstructions)
-                #sobel_reg = torch.mean(sobel(segmentations))
-                loss = (l_n_cut + l_reconstruction)
-
-                if torch.isnan(loss):
-                    print('loss is NaN, stopping')
-                    break
-                
                 # apply learning rate schedule
                 lr = get_lr(it = iter_num,
                             warmup_iters = warmup_iters, 
@@ -238,14 +232,29 @@ def train_model(model,
                             max_lr = max_lr, 
                             min_lr = min_lr)
                 
-                for param_group in optimizer.param_groups:
-                    param_group['lr'] = lr
+                for param_group1, param_group2 in zip(optE.param_groups, optW.param_groups):
+                    param_group1['lr'] = lr
+                    param_group2['lr'] = lr
                 
-                loss.backward()
+                # compute n_cut loss and update
+                segmentations = model.forward_encoder(xb)
+                l_n_cut = n_cut_loss(segmentations, xb)
 
-                optimizer.step()
+                l_n_cut.backward(retain_graph=False)
+                optE.step()
+                optE.zero_grad(set_to_none=True)
 
-                optimizer.zero_grad(set_to_none=True)
+                # compute reconstruction loss
+                segmentations, reconstructions = model(xb)
+                l_reconstruction = Loss.reconstruction_loss(yb, reconstructions)
+
+                l_reconstruction.backward(retain_graph=False)
+                optW.step()
+                optW.zero_grad(set_to_none=True)
+
+                if torch.isnan(l_n_cut) or torch.isnan(l_reconstruction):
+                    print('loss is NaN, stopping')
+                    break
 
                 # update book keeping
                 pbar.update(1)
