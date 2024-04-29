@@ -123,6 +123,6 @@ class OpeningLoss2D(nn.Module):
 
 
 def reconstruction_loss(x, x_prime):
-    bce = F.binary_cross_entropy(x_prime, x, reduction = 'mean')
+    bce = F.binary_cross_entropy(x_prime, x, reduction = 'sum')
     return bce
     
