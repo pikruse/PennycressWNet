@@ -100,7 +100,7 @@ def segment_image(model,
 
                     # make prediction and store the *center context* in global prb. map
                     unet_input = torch.tensor(tile, dtype=torch.float32).to(device).permute(2, 0, 1).unsqueeze(0)
-                    prediction, reconstruction = model(unet_input)
+                    prediction = model.forward_encoder(unet_input)
 
 
                     # softmax output
