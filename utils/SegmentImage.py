@@ -16,10 +16,12 @@ sys.path.append('../')
 # custom imports
 from utils.Metrics import iou
 from utils.GetLowestGPU import GetLowestGPU
+from utils.CRF import crf_fit_predict
 
 device = torch.device(GetLowestGPU(verbose=0))
 
 def segment_image(model,
+                  k,
                   image_path,
                   mask_path,
                   save_path,
@@ -84,7 +86,8 @@ def segment_image(model,
                     mode='edge')
 
         # initialize global prb. map with same spatial (H, W) dimensions as image and channel for each class
-        global_prb_map = np.zeros((image.shape[0], image.shape[1], 4))
+        global_prb_map = np.zeros((image.shape[0], image.shape[1], k))
+        global_recon_map = np.zeros((image.shape[0], image.shape[1], 3))
 
         ## BOOKKEEPING / PREDICTION
 
@@ -102,12 +105,16 @@ def segment_image(model,
                     unet_input = torch.tensor(tile, dtype=torch.float32).to(device).permute(2, 0, 1).unsqueeze(0)
                     prediction = model.forward_encoder(unet_input)
 
+                    # recon = model.forward_decoder(prediction)
 
-                    # softmax output
-                    prediction = torch.nn.functional.softmax(prediction, dim=1)
+                    # softmax / sigmoid output
+                    # prediction = torch.nn.functional.softmax(prediction, dim=1)
+                    # recon = torch.nn.functional.sigmoid(recon)
+
 
                     # shuffle to be rows-cols-channels order and only take the center 64x64 square
                     prediction = prediction[0].permute(1, 2, 0)[32:-32, 32:-32, :]
+                    # recon = recon[0].permute(1, 2, 0)[32:-32, 32:-32, :]
 
                     # add predicted probabilities to prb map at index
                     global_prb_map[row+32:row+96, col+32:col+96, :] += prediction.detach().cpu().numpy()
@@ -193,6 +200,9 @@ def segment_image(model,
 
             ax[2].imshow(pred_image)
             ax[2].set_title("Predicted Mask")
+
+            # ax[3].imshow(global_recon_map)
+            # ax[3].set_title("Reconstructed Image")
 
         # append to pred images list for counting
         pred_images.append(pred_image)

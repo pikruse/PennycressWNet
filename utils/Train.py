@@ -193,11 +193,13 @@ def train_model(model,
             best_reconstruction = val_l_reconstruction
 
         if iter_num > 0:
-            if val_l_n_cut < best_n_cut and val_l_reconstruction < best_reconstruction:
-                best_n_cut = val_l_n_cut
-                best_reconstruction = val_l_reconstruction
+            if val_l_n_cut < best_n_cut or val_l_reconstruction < best_reconstruction:
+                if val_l_n_cut < best_n_cut:
+                    best_n_cut = val_l_n_cut
+                if val_l_reconstruction < best_reconstruction:
+                    best_reconstruction = val_l_reconstruction
                 last_improved = 0
-                print(f'*** validation losses improved ***\n*** N-cut: {best_n_cut:.4e}, reconstruction: {best_reconstruction} ***')
+                print(f'*** validation loss improved ***\n*** N-cut: {best_n_cut:.4e}, reconstruction: {best_reconstruction} ***')
             else:
                 last_improved += 1
                 print(f'validation has not improved in {last_improved} steps')
