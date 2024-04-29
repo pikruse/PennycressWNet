@@ -7,13 +7,15 @@ import torch.nn.functional as F
 
 from torch.autograd import Function
 from scipy.ndimage import grey_opening
+from importlib import reload
 
 sys.path.append('../')
 
 # custom imports
 from utils.GetLowestGPU import GetLowestGPU
-from utils.Filter import gaussian_kernel
+import utils.Filter as Filter
 
+reload(Filter)
 class NCutLoss2D(nn.Module):
 
     """
@@ -53,7 +55,9 @@ class NCutLoss2D(nn.Module):
         """
 
         num_classes = labels.shape[1]
-        kernel = gaussian_kernel(self.radius, self.sigma_1, device = self.device)
+        kernel = Filter.gaussian_kernel(device = self.device,
+                                 radius = self.radius, 
+                                 sigma = self.sigma_1)
         loss = 0
 
         for k in range(num_classes):
@@ -68,7 +72,7 @@ class NCutLoss2D(nn.Module):
 
             # compute N-cut loss with weight matrix and gaussian spatial filter
             numerator = torch.sum(class_probs * F.conv2d(class_probs * weights, kernel, padding=self.radius))
-            denominator = torch.sum(class_probs * F.conv2d(weights, kernel, self.radius))
+            denominator = torch.sum(class_probs * F.conv2d(weights, kernel, padding=self.radius))
             loss += nn.L1Loss()(numerator / torch.add(denominator, 1e-6), torch.zeros_like(numerator))
         
         return num_classes - loss
@@ -93,6 +97,7 @@ class OpeningLoss2D(nn.Module):
 
         super(OpeningLoss2D, self).__init__()
         self.radius = radius
+        self.device = device
 
     def forward(self, labels:torch.Tensor, *args) -> torch.Tensor:
         """
