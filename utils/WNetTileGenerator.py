@@ -50,8 +50,8 @@ class TileGenerator(Dataset):
             
             # binary threshold to make mask
             roi = m.sum(-1) > 1
-            roi = binary_dilation(roi, iterations=tile_size//2)
             roi = ~roi
+            roi = binary_dilation(roi, iterations=tile_size//2)
             roi[:n_pad], roi[-n_pad:] = 0, 0
             roi[:, :n_pad], roi[:, -n_pad:] = 0, 0
             row_col_ixs = np.argwhere(roi) #return array containing indices w/ all values inside padding

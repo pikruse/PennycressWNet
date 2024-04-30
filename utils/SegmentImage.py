@@ -87,7 +87,8 @@ def segment_image(model,
 
         # initialize global prb. map with same spatial (H, W) dimensions as image and channel for each class
         global_prb_map = np.zeros((image.shape[0], image.shape[1], k))
-        global_recon_map = np.zeros((image.shape[0], image.shape[1], 3))
+        global_rec_map = np.zeros((image.shape[0], image.shape[1], 3))
+        rec_counts = np.zeros((image.shape[0], image.shape[1]))
 
         ## BOOKKEEPING / PREDICTION
 
@@ -104,28 +105,28 @@ def segment_image(model,
                     # make prediction and store the *center context* in global prb. map
                     unet_input = torch.tensor(tile, dtype=torch.float32).to(device).permute(2, 0, 1).unsqueeze(0)
                     prediction = model.forward_encoder(unet_input)
-
-                    # recon = model.forward_decoder(prediction)
-
-                    # softmax / sigmoid output
-                    # prediction = torch.nn.functional.softmax(prediction, dim=1)
-                    # recon = torch.nn.functional.sigmoid(recon)
-
+                    rec = model.forward_decoder(prediction)
 
                     # shuffle to be rows-cols-channels order and only take the center 64x64 square
                     prediction = prediction[0].permute(1, 2, 0)[32:-32, 32:-32, :]
-                    # recon = recon[0].permute(1, 2, 0)[32:-32, 32:-32, :]
+                    rec = rec[0].permute(1, 2, 0)[32:-32, 32:-32, :]
 
                     # add predicted probabilities to prb map at index
                     global_prb_map[row+32:row+96, col+32:col+96, :] += prediction.detach().cpu().numpy()
+                    global_rec_map[row+32:row+96, col+32:col+96, :] += rec.detach().cpu().numpy()
+                    rec_counts[row+32:row+96, col+32:col+96] += 1
                     pbar.update(1)
 
         # now that we have full prb. map, remove the padding 
         global_prb_map = global_prb_map[32:-(32+rpad), 32:-(32+cpad), :]
+        global_rec_map = global_rec_map[32:-(32+rpad), 32:-(32+cpad), :]
+        rec_counts = rec_counts[32:-(32+rpad), 32:-(32+cpad)]
+
         image = image[32:-(32+rpad), 32:-(32+cpad), :]
 
-        # and normalize prbs. s.t they sum to one
+        # and normalize prbs. / rec s.t they sum to one
         global_prb_map = global_prb_map / global_prb_map.sum(axis=-1, keepdims=True)
+        global_rec_map = global_rec_map / rec_counts[:, :, None].clip(min=1)
 
         # convert predicted probabilities to predicted classes and retain four channels
         argmaxes = np.argmax(global_prb_map, axis=2)
@@ -190,7 +191,7 @@ def segment_image(model,
         
         if plot:
             # plot the image and prediction together
-            fig, ax = plt.subplots(1, 3, figsize=(40, 20))
+            fig, ax = plt.subplots(1, 4, figsize=(40, 20))
             ax[0].imshow(image)
             ax[0].set_title("Original Image")
 
@@ -201,8 +202,8 @@ def segment_image(model,
             ax[2].imshow(pred_image)
             ax[2].set_title("Predicted Mask")
 
-            # ax[3].imshow(global_recon_map)
-            # ax[3].set_title("Reconstructed Image")
+            ax[3].imshow(global_rec_map)
+            ax[3].set_title("Reconstructed Image")
 
         # append to pred images list for counting
         pred_images.append(pred_image)
