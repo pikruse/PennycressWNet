@@ -163,7 +163,6 @@ class UNet(torch.nn.Module):
         #propagate through decoder layers
         j = 0 # set index control var for cache
         for i, dec_layer in enumerate(self.dec_layers):
-            
             x = dec_layer(x)
 
             if (i+1) % ((self.conv_per_block * 4) + 2) == 2: # (self.conv_per_block * 4) + 2 layers per decoder block; on the 2nd layer, concatenate with cache

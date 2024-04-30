@@ -75,17 +75,11 @@ def train_model(model,
     Returns:
         None
     """
-
-
-    # split optimizers
-    optE = optimizers[0]
-    optW = optimizers[1]
     
     # non-customizable options
-    iter_update = 'train N-cut loss: {1:.4e}, train reconstruction loss: {2:.4e}\nval N-cut loss: {3:.4e}, val reconstruction loss: {4:.4e}\r'
+    iter_update = 'train N-cut loss: {1:.4e}, train reconstruction loss: {2:.4e}\nval N-cut loss: {4:.4e}, val reconstruction loss: {5:.4e}\n\r'
 
-    best_n_cut = None # initialize best validation loss
-    best_reconstruction = None # initialize best validation loss
+    best_loss = None
 
     last_improved = 0 # start early stopping counter
     iter_num = 0 # initialize iteration counter
@@ -93,11 +87,15 @@ def train_model(model,
 
     # init. losses
     n_cut_loss = Loss.NCutLoss2D(device = device)
+    # opening_loss = Loss.OpeningLoss2D(device = device)
+
+    # init. optimizers
+    optE, optW = optimizers
 
     # training loop
     # refresh log
     with open(log_path, 'w') as f: 
-        f.write(f'iter_num,train_n_cut,train_reconstruction,val_n_cut,val_reconstruction\n')
+        f.write(f'iter_num,train_n_cut,train_reconstruction,train_loss,val_n_cut,val_reconstruction,val_loss\n')
 
     # keep training until break
     while True:
@@ -105,10 +103,10 @@ def train_model(model,
         # clear print output
         clear_output(wait=True)
 
-        if (best_n_cut and best_reconstruction) is not None:
-            print('------------------------------------------------------------------------------\n',
-                f'Iteration: {iter_num} | Best N-cut: {best_n_cut:.4e} | Best Reconstruction: {best_reconstruction:.4e}\n', 
-                '------------------------------------------------------------------------------', sep = '')
+        if (best_loss) is not None:
+            print('---------------------------------------\n',
+                f'Iteration: {iter_num} | Best Total Loss: {best_loss:.4e}\n', 
+                '---------------------------------------', sep = '')
         else:
             print('-------------\n',
                 f'Iteration: {iter_num}\n', 
@@ -135,7 +133,13 @@ def train_model(model,
         # estimate loss
         model.eval()
         with torch.no_grad():
-            train_l_n_cut, train_l_reconstruction, val_l_n_cut, val_l_reconstruction = 0, 0, 0, 0
+            # init overall losses
+            train_loss, val_loss = 0, 0
+
+            # init individual losses
+            tb_n_cut, tb_rec = 0, 0
+            vb_n_cut, vb_rec = 0, 0
+
             with tqdm(total=batches_per_eval, desc=' Eval') as pbar:
                 for (xbt, ybt), (xbv, ybv) in zip(train_loader, val_loader):
                     xbt, ybt = xbt.to(device), ybt.to(device)
@@ -143,37 +147,51 @@ def train_model(model,
 
                     #compute train loss
                     train_segmentations, train_reconstructions = model(xbt)
-                    train_l_n_cut += n_cut_loss(train_segmentations, xbt)
-                    train_l_reconstruction += (Loss.reconstruction_loss(ybt, train_reconstructions))
+                    train_l_n_cut = n_cut_loss(train_segmentations, xbt)
+                    # train_l_opening = opening_loss(train_segmentations, xbt)
+                    train_l_reconstruction = (Loss.reconstruction_loss(ybt, train_reconstructions))
+
+                    # update losses
+                    tb_n_cut += train_l_n_cut
+                    # tb_open += train_l_opening
+                    tb_rec += train_l_reconstruction
+                    train_loss += train_l_n_cut + train_l_reconstruction #+ train_l_opening
 
                     #compute val loss
                     val_segmentations, val_reconstructions = model(xbv)
-                    val_l_n_cut += n_cut_loss(val_segmentations, xbv)
-                    val_l_reconstruction += (Loss.reconstruction_loss(ybv, val_reconstructions))
+                    val_l_n_cut = n_cut_loss(val_segmentations, xbv)
+                    # val_l_opening = opening_loss(val_segmentations, xbv)
+                    val_l_reconstruction = (Loss.reconstruction_loss(ybv, val_reconstructions))
+
+                    # update losses
+                    vb_n_cut += val_l_n_cut
+                    # vb_open += val_l_opening
+                    vb_rec += val_l_reconstruction
+                    val_loss += val_l_n_cut + val_l_reconstruction #+ val_l_opening
 
                     pbar.update(1)
                     if pbar.n == pbar.total:
                         break
 
-            train_l_n_cut /= batches_per_eval
-            train_l_reconstruction /= batches_per_eval
+            train_loss /= batches_per_eval
 
-            val_l_n_cut /= batches_per_eval
-            val_l_reconstruction /= batches_per_eval
+            val_loss /= batches_per_eval
 
         # set model back to training mode
         model.train()
 
         # update user
         print(iter_update.format(iter_num, 
-                                 train_l_n_cut,
-                                 train_l_reconstruction, 
-                                 val_l_n_cut, 
-                                 val_l_reconstruction)) 
+                                 tb_n_cut, 
+                                 tb_rec,
+                                 train_loss,
+                                 vb_n_cut,
+                                 vb_rec,
+                                 val_loss)) 
 
         # update log
         with open(log_path, 'a') as f: 
-            f.write(f'{iter_num},{train_l_n_cut},{train_l_reconstruction},{val_l_n_cut},{val_l_reconstruction}\n')
+            f.write(f'{iter_num},{tb_n_cut},{tb_rec},{train_loss},{vb_n_cut},{vb_rec},{val_loss}\n')
 
         # checkpoint model
         if iter_num > 0:
@@ -182,25 +200,20 @@ def train_model(model,
                 'optimizer_E': optE.state_dict(),
                 'optimizer_W': optW.state_dict(),
                 'iter_num': iter_num,
-                'best_n_cut': best_n_cut,
-                'best_reconstruction': best_reconstruction
+                'best_loss': best_loss
             }
 
             torch.save(checkpoint, chckpnt_path.format(iter_num))
 
         # book keeping
-        if (best_n_cut and best_reconstruction) is None:
-            best_n_cut = val_l_n_cut
-            best_reconstruction = val_l_reconstruction
+        if (best_loss) is None:
+            best_loss = val_loss
 
         if iter_num > 0:
-            if val_l_n_cut < best_n_cut or val_l_reconstruction < best_reconstruction:
-                if val_l_n_cut < best_n_cut:
-                    best_n_cut = val_l_n_cut
-                if val_l_reconstruction < best_reconstruction:
-                    best_reconstruction = val_l_reconstruction
+            if val_loss < best_loss:
+                best_loss = val_loss
                 last_improved = 0
-                print(f'*** validation loss improved ***\n*** N-cut: {best_n_cut:.4e}, reconstruction: {best_reconstruction:.4e} ***')
+                print(f'*** validation loss improved: {best_loss:.4e}***\n')
             else:
                 last_improved += 1
                 print(f'validation has not improved in {last_improved} steps')
@@ -239,10 +252,11 @@ def train_model(model,
                     param_group1['lr'] = lr
                     param_group2['lr'] = lr
                 
-                # compute n_cut loss and update
+                # compute n_cut and opening loss and update
                 segmentations = model.forward_encoder(xb)
                 l_n_cut = n_cut_loss(segmentations, xb)
-
+                # l_opening = opening_loss(segmentations, xb)
+                # l_n_o = l_n_cut + l_opening
                 l_n_cut.backward(retain_graph=False)
                 optE.step()
                 optE.zero_grad(set_to_none=True)
@@ -250,7 +264,6 @@ def train_model(model,
                 # compute reconstruction loss
                 segmentations, reconstructions = model(xb)
                 l_reconstruction = (Loss.reconstruction_loss(yb, reconstructions))
-
                 l_reconstruction.backward(retain_graph=False)
                 optW.step()
                 optW.zero_grad(set_to_none=True)
