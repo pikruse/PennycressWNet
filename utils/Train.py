@@ -89,6 +89,7 @@ def train_model(model,
 
     last_improved = 0 # start early stopping counter
     iter_num = 0 # initialize iteration counter
+    # shrinkage = 1e-6 # scale rec. loss
 
     # init. losses
     n_cut_loss = Loss.NCutLoss2D(device = device)
@@ -143,12 +144,12 @@ def train_model(model,
                     #compute train loss
                     train_segmentations, train_reconstructions = model(xbt)
                     train_l_n_cut += n_cut_loss(train_segmentations, xbt)
-                    train_l_reconstruction += Loss.reconstruction_loss(ybt, train_reconstructions)
+                    train_l_reconstruction += (Loss.reconstruction_loss(ybt, train_reconstructions))
 
                     #compute val loss
                     val_segmentations, val_reconstructions = model(xbv)
                     val_l_n_cut += n_cut_loss(val_segmentations, xbv)
-                    val_l_reconstruction += Loss.reconstruction_loss(ybv, val_reconstructions)
+                    val_l_reconstruction += (Loss.reconstruction_loss(ybv, val_reconstructions))
 
                     pbar.update(1)
                     if pbar.n == pbar.total:
@@ -199,7 +200,7 @@ def train_model(model,
                 if val_l_reconstruction < best_reconstruction:
                     best_reconstruction = val_l_reconstruction
                 last_improved = 0
-                print(f'*** validation loss improved ***\n*** N-cut: {best_n_cut:.4e}, reconstruction: {best_reconstruction} ***')
+                print(f'*** validation loss improved ***\n*** N-cut: {best_n_cut:.4e}, reconstruction: {best_reconstruction:.4e} ***')
             else:
                 last_improved += 1
                 print(f'validation has not improved in {last_improved} steps')
@@ -248,7 +249,7 @@ def train_model(model,
 
                 # compute reconstruction loss
                 segmentations, reconstructions = model(xb)
-                l_reconstruction = Loss.reconstruction_loss(yb, reconstructions)
+                l_reconstruction = (Loss.reconstruction_loss(yb, reconstructions))
 
                 l_reconstruction.backward(retain_graph=False)
                 optW.step()

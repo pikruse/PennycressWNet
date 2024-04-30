@@ -1,6 +1,7 @@
 import os, sys, glob
 import numpy as np
 import torch
+from importlib import reload
 
 sys.path.append('../')
 
@@ -22,6 +23,8 @@ we double the number of feature channels at each downsampling step
 We halve the number of feature channels at each upsampling step
 
 """
+
+reload(BuildUNet)
 
 # options
 BatchNorm = True
@@ -175,7 +178,7 @@ class WNet(torch.nn.Module):
     def __init__(self,
                  k = 4,
                  enc_layer_sizes = [32, 64, 128, 256],
-                 dec_layer_sizes = [32, 64, 128]):
+                 dec_layer_sizes = [32, 64, 128, 256]):
         super(WNet, self).__init__()
 
         self.U_encoder = BuildUNet.UNet(layer_sizes = enc_layer_sizes,
@@ -192,7 +195,7 @@ class WNet(torch.nn.Module):
                                    in_channels=k,
                                    out_channels=3,
                                    dropout_rate=0.1,
-                                   conv_per_block=1,
+                                   conv_per_block=3,
                                    hidden_activation=torch.nn.LeakyReLU(),
                                    output_activation=None)
         

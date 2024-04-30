@@ -91,7 +91,7 @@ class UNet(torch.nn.Module):
                     out_channels=out_channels,
                     kernel_size=self.kernel_size,
                     padding=self.padding),
-                torch.nn.InstanceNorm2d(out_channels),
+                torch.nn.BatchNorm2d(out_channels),
                 self.hidden_activation,
                 torch.nn.Dropout2d(self.dropout_rate)
                 )
@@ -103,7 +103,7 @@ class UNet(torch.nn.Module):
                         out_channels=out_channels,
                         kernel_size=self.kernel_size,
                         padding=self.padding),
-                    torch.nn.InstanceNorm2d(out_channels),
+                    torch.nn.BatchNorm2d(out_channels),
                     self.hidden_activation,
                     torch.nn.Dropout2d(self.dropout_rate)
                 )
