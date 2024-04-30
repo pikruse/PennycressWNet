@@ -172,9 +172,13 @@ def train_model(model,
                     pbar.update(1)
                     if pbar.n == pbar.total:
                         break
-
+            
+            tb_n_cut /= batches_per_eval
+            tb_rec /= batches_per_eval
             train_loss /= batches_per_eval
 
+            vb_n_cut /= batches_per_eval
+            vb_rec /= batches_per_eval
             val_loss /= batches_per_eval
 
         # set model back to training mode

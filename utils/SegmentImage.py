@@ -24,7 +24,8 @@ def segment_image(model,
                   k,
                   image_path,
                   mask_path,
-                  save_path,
+                  pred_save_path,
+                  rec_save_path,
                   image_names,
                   plot = True,
                   verbose = 2,
@@ -36,7 +37,7 @@ def segment_image(model,
     Parameters:
         image_path (str): path to directory containing images
         mask_path (str): path to directory containing masks
-        save_path (str): path to save predicted segmentations
+        pred_save_path (str): path to save predicted segmentations
         image_names (list): list of image names to process
         plot (bool): whether to plot the images
         verbose (0, 1, or 2): whether to print average and IoU scores per image (2), just average IoU scores, or nothing at all
@@ -210,7 +211,10 @@ def segment_image(model,
 
         # save the predicted mask
         pred_image = Image.fromarray((pred_image * 255).astype(np.uint8))
-        pred_image.save(save_path + "pred_" + image_name)
+        pred_image.save(pred_save_path + "pred_" + image_name)
+
+        rec_image = Image.fromarray((global_rec_map * 255).astype(np.uint8))
+        rec_image.save(pred_save_path + "rec_" + image_name)
 
     avg_wing = np.mean(wing_ious)
     avg_env = np.mean(env_ious)
