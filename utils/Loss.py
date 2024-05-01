@@ -16,65 +16,51 @@ from utils.GetLowestGPU import GetLowestGPU
 import utils.Filter as Filter
 
 reload(Filter)
+
 class NCutLoss2D(nn.Module):
+    r"""Implementation of the continuous N-Cut loss, as in:
+    'W-Net: A Deep Model for Fully Unsupervised Image Segmentation', by Xia, Kulis (2017)"""
 
-    """
-    Implementation of continuous N-Cut loss, from: https://github.com/fkodom/wnet-unsupervised-image-segmentation/tree/master
-    """
-
-    def __init__(self,
-                 device,
-                 radius: int = 4,
-                 sigma_1: float = 5,
-                 sigma_2: float = 1):
-        
+    def __init__(self, device, radius: int = 4, sigma_1: float = 5, sigma_2: float = 1):
+        r"""
+        :param radius: Radius of the spatial interaction term
+        :param sigma_1: Standard deviation of the spatial Gaussian interaction
+        :param sigma_2: Standard deviation of the pixel value Gaussian interaction
         """
-        Parameters:
-            radius (int): radius of spatial interaction term
-            sigma_1 (float): standard deviation of the spatial Gaussian interaction
-            sigma_2 (float): standard deviation of the pixel value Gaussian interaction
-    
-        """
-
         super(NCutLoss2D, self).__init__()
-
         self.radius = radius
-        self.sigma_1 = sigma_1
-        self.sigma_2 = sigma_2
         self.device = device
+        self.sigma_1 = sigma_1  # Spatial standard deviation
+        self.sigma_2 = sigma_2  # Pixel value standard deviation
 
-    def forward (self, labels: torch.Tensor, inputs: torch.Tensor):
-        """
-        Compute the continuous N-Cut loss, given a set of class probabilities (labels) and raw images (inputs)
-        
-        Parameters:
-            labels (torch.Tensor): class probabilities
-            inputs (torch.Tensor): raw images
-        Returns:
-            torch.Tensor: the N-Cut loss
-        """
+    def forward(self, labels: torch.Tensor, inputs:torch.Tensor) -> torch.Tensor:
+        r"""Computes the continuous N-Cut loss, given a set of class probabilities (labels) and raw images (inputs).
+        Small modifications have been made here for efficiency -- specifically, we compute the pixel-wise weights
+        relative to the class-wide average, rather than for every individual pixel.
 
+        :param labels: Predicted class probabilities
+        :param inputs: Raw images
+        :return: Continuous N-Cut loss
+        """
         num_classes = labels.shape[1]
-        kernel = Filter.gaussian_kernel(device = self.device,
-                                 radius = self.radius, 
-                                 sigma = self.sigma_1)
+        kernel = Filter.gaussian_kernel(radius=self.radius, sigma=self.sigma_1, device=self.device)
         loss = 0
 
         for k in range(num_classes):
-            # compute avg. pixel value of class k and difference from each pixel
+            # Compute the average pixel value for this class, and the difference from each pixel
             class_probs = labels[:, k].unsqueeze(1)
-            class_mean = torch.mean(inputs * class_probs, dim = (2,3), keepdim=True) / torch.add(torch.mean(class_probs, dim = (2,3), keepdim=True), 1e-5)
-            
+            class_mean = torch.mean(inputs * class_probs, dim=(2, 3), keepdim=True) / \
+                torch.add(torch.mean(class_probs, dim=(2, 3), keepdim=True), 1e-5)
             diff = (inputs - class_mean).pow(2).sum(dim=1).unsqueeze(1)
 
-            # weight loss by difference from the class average
-            weights = torch.exp(diff.pow(2).mul(-1.0 / self.sigma_2 ** 2))
+            # Weight the loss by the difference from the class average.
+            weights = torch.exp(diff.pow(2).mul(-1 / self.sigma_2 ** 2))
 
-            # compute N-cut loss with weight matrix and gaussian spatial filter
+            # Compute N-cut loss, using the computed weights matrix, and a Gaussian spatial filter
             numerator = torch.sum(class_probs * F.conv2d(class_probs * weights, kernel, padding=self.radius))
             denominator = torch.sum(class_probs * F.conv2d(weights, kernel, padding=self.radius))
             loss += nn.L1Loss()(numerator / torch.add(denominator, 1e-6), torch.zeros_like(numerator))
-        
+
         return num_classes - loss
 
     
