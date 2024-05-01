@@ -214,7 +214,7 @@ def segment_image(model,
         pred_image.save(pred_save_path + "pred_" + image_name)
 
         rec_image = Image.fromarray((global_rec_map * 255).astype(np.uint8))
-        rec_image.save(pred_save_path + "rec_" + image_name)
+        rec_image.save(rec_save_path + "rec_" + image_name)
 
     avg_wing = np.mean(wing_ious)
     avg_env = np.mean(env_ious)
